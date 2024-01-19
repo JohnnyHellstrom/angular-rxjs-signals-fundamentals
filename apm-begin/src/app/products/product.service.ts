@@ -5,8 +5,11 @@ import { HttpErrorService } from '../utilities/http-error.service';
 import { ReviewService } from '../reviews/review.service';
 import { Review } from '../reviews/review';
 import {
+  BehaviorSubject,
   Observable,
   catchError,
+  combineLatest,
+  filter,
   map,
   of,
   shareReplay,
@@ -25,19 +28,39 @@ export class ProductService {
   private errorService = inject(HttpErrorService);
   private reviewService = inject(ReviewService);
 
-  readonly products$ = this.http.get<Product[]>(this.productsUrl).pipe(
-    tap((p) => console.log(JSON.stringify(p))),
-    shareReplay(1),
-    catchError((err) => this.handleError(err))
-  );
+  private productSelectedSubject = new BehaviorSubject<number | undefined>(undefined);
+  readonly productSelected$ = this.productSelectedSubject.asObservable();
 
-  getProduct(id: number): Observable<Product> {
-    const productUrl = this.productsUrl + '/' + id;
-    return this.http.get<Product>(productUrl).pipe(
-      tap(() => console.log('in http get by id pipeline')),
+  readonly products$ = this.http.get<Product[]>(this.productsUrl)
+    .pipe(
+      tap((p) => console.log(JSON.stringify(p))),
+      shareReplay(1),
+      catchError((err) => this.handleError(err))
+    );
+
+  readonly product1$ = this.productSelected$
+    .pipe(
+      filter(Boolean),
+      switchMap(id => {
+        const productUrl = this.productsUrl + '/' + id;
+        return this.http.get<Product>(productUrl)
+          .pipe(
+            switchMap((product) => this.getProductReviews(product)),
+            catchError((err) => this.handleError(err))
+          );
+      })
+    );
+
+  readonly product$ = combineLatest([this.productSelected$, this.products$])
+    .pipe(
+      map(([selectedProductId, products]) => products.find(product => product.id === selectedProductId)),
+      filter(Boolean),
       switchMap((product) => this.getProductReviews(product)),
       catchError((err) => this.handleError(err))
     );
+
+  productSelected(selectedProductId: number): void {
+    this.productSelectedSubject.next(selectedProductId);
   }
 
   private getProductReviews(product: Product): Observable<Product> {
