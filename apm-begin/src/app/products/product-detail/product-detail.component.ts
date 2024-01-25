@@ -1,9 +1,7 @@
-import { Component, inject } from '@angular/core';
-
+import { Component, computed, inject } from '@angular/core';
 import { NgIf, NgFor, CurrencyPipe, AsyncPipe } from '@angular/common';
 import { Product } from '../product';
 import { ProductService } from '../product.service';
-import { EMPTY, catchError } from 'rxjs';
 import { CartService } from 'src/app/cart/cart.service';
 
 @Component({
@@ -13,24 +11,19 @@ import { CartService } from 'src/app/cart/cart.service';
   imports: [NgIf, NgFor, CurrencyPipe, AsyncPipe],
 })
 export class ProductDetailComponent {
-  errorMessage = '';
-
   private productService = inject(ProductService);
   private cartService = inject(CartService);
 
   // Product to display
-  product$ = this.productService.product$.pipe(
-    catchError((err) => {
-      this.errorMessage = err;
-      return EMPTY;
-    })
-  );
+  product = this.productService.product;
+  errorMessage = this.productService.productError;
 
   // Set the page title
-  pageTitle = 'ProductDetail';
-  // pageTitle = this.product
-  //   ? `Product Detail for: ${this.product.productName}`
-  //   : 'Product Detail';
+  pageTitle = computed(() =>
+    this.product()
+      ? `Product Detail for: ${this.product()?.productName}`
+      : 'Product Detail'
+  );
 
   addToCart(product: Product) {
     this.cartService.addToCart(product);
